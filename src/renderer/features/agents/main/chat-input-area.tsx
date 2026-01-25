@@ -619,6 +619,9 @@ export const ChatInputArea = memo(function ChatInputArea({
 
   const MAX_FILE_SIZE_FOR_CONTENT = 100 * 1024 // 100KB - files larger than this only get path mention
 
+  // Image extensions that should be handled as attachments (base64)
+  const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"])
+
   const trpcUtils = trpc.useUtils()
 
   const handleDrop = useCallback(
@@ -627,8 +630,26 @@ export const ChatInputArea = memo(function ChatInputArea({
       setIsDragOver(false)
       const droppedFiles = Array.from(e.dataTransfer.files)
 
-      // Process files - for text files, read content and add as pasted text
+      // Separate images from other files
+      const imageFiles: File[] = []
+      const otherFiles: File[] = []
+
       for (const file of droppedFiles) {
+        const ext = file.name.includes(".") ? "." + file.name.split(".").pop()?.toLowerCase() : ""
+        if (IMAGE_EXTENSIONS.has(ext)) {
+          imageFiles.push(file)
+        } else {
+          otherFiles.push(file)
+        }
+      }
+
+      // Handle images via existing attachment system (base64)
+      if (imageFiles.length > 0) {
+        onAddAttachments(imageFiles)
+      }
+
+      // Process other files - for text files, read content and add as file mention
+      for (const file of otherFiles) {
         // Get file path using Electron's webUtils API (more reliable than file.path)
         // @ts-expect-error - Electron's webUtils API
         const filePath: string | undefined = window.webUtils?.getPathForFile?.(file) || (file as File & { path?: string }).path
@@ -698,7 +719,7 @@ export const ChatInputArea = memo(function ChatInputArea({
         })
       })
     },
-    [editorRef, projectPath, onCacheFileContent, trpcUtils],
+    [editorRef, projectPath, onCacheFileContent, onAddAttachments, trpcUtils],
   )
 
   return (

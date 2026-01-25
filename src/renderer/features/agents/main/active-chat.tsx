@@ -2901,7 +2901,7 @@ const ChatViewInner = memo(function ChatViewInner({
 
   // Track plan Edit completions to trigger sidebar refetch
   const triggerPlanEditRefetch = useSetAtom(
-    useMemo(() => planEditRefetchTriggerAtomFamily(parentChatId), [parentChatId])
+    useMemo(() => planEditRefetchTriggerAtomFamily(subChatId), [subChatId])
   )
   const lastPlanEditCountRef = useRef(0)
 

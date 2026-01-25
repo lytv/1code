@@ -716,6 +716,11 @@ const AgentChatItem = React.memo(function AgentChatItem({
                 </ContextMenuItem>
               </ContextMenuSubContent>
             </ContextMenuSub>
+            {isDesktop && (
+              <ContextMenuItem onClick={() => window.desktopApi?.newWindow({ chatId })}>
+                Open in new window
+              </ContextMenuItem>
+            )}
             <ContextMenuSeparator />
             <ContextMenuItem onClick={() => onArchive(chatId)} className="justify-between">
               Archive workspace

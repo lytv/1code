@@ -28,7 +28,13 @@ import {
 } from "./lib/cli"
 import { cleanupGitWatchers } from "./lib/git/watcher"
 import { cancelAllPendingOAuth, handleMcpOAuthCallback } from "./lib/mcp-auth"
-import { createMainWindow, getWindow } from "./windows/main"
+import {
+  createMainWindow,
+  createWindow,
+  getWindow,
+  getAllWindows,
+} from "./windows/main"
+import { windowManager } from "./windows/window-manager"
 
 import { IS_DEV, AUTH_SERVER_PORT } from "./constants"
 
@@ -128,20 +134,46 @@ export async function handleAuthCode(code: string): Promise<void> {
       console.warn("[Auth] Cookie set failed (non-critical):", cookieError)
     }
 
-    // Notify renderer
-    const win = getWindow()
-    win?.webContents.send("auth:success", authData.user)
+    // Notify all windows and reload them to show app
+    const windows = getAllWindows()
+    for (const win of windows) {
+      try {
+        if (win.isDestroyed()) continue
+        win.webContents.send("auth:success", authData.user)
 
-    // Reload window to show app
-    if (process.env.ELECTRON_RENDERER_URL) {
-      win?.loadURL(process.env.ELECTRON_RENDERER_URL)
-    } else {
-      win?.loadFile(join(__dirname, "../renderer/index.html"))
+        // Use stable window ID (main, window-2, etc.) instead of Electron's numeric ID
+        const stableId = windowManager.getStableId(win)
+
+        if (process.env.ELECTRON_RENDERER_URL) {
+          // Pass window ID via query param for dev mode
+          const url = new URL(process.env.ELECTRON_RENDERER_URL)
+          url.searchParams.set("windowId", stableId)
+          win.loadURL(url.toString())
+        } else {
+          // Pass window ID via hash for production
+          win.loadFile(join(__dirname, "../renderer/index.html"), {
+            hash: `windowId=${stableId}`,
+          })
+        }
+      } catch (error) {
+        // Window may have been destroyed during iteration
+        console.warn("[Auth] Failed to reload window:", error)
+      }
     }
-    win?.focus()
+    // Focus the first window
+    windows[0]?.focus()
   } catch (error) {
     console.error("[Auth] Exchange failed:", error)
-    getWindow()?.webContents.send("auth:error", (error as Error).message)
+    // Broadcast auth error to all windows (not just focused)
+    for (const win of getAllWindows()) {
+      try {
+        if (!win.isDestroyed()) {
+          win.webContents.send("auth:error", (error as Error).message)
+        }
+      } catch {
+        // Window destroyed during iteration
+      }
+    }
   }
 }
 
@@ -499,10 +531,15 @@ if (gotTheLock) {
       handleDeepLink(url)
     }
 
-    const window = getWindow()
-    if (window) {
+    // Focus on the first available window
+    const windows = getAllWindows()
+    if (windows.length > 0) {
+      const window = windows[0]!
       if (window.isMinimized()) window.restore()
       window.focus()
+    } else {
+      // No windows open, create a new one
+      createMainWindow()
     }
   })
 
@@ -653,6 +690,25 @@ if (gotTheLock) {
                 }
               },
             },
+            {
+              label: "New Window",
+              accelerator: "CmdOrCtrl+Shift+N",
+              click: () => {
+                console.log("[Menu] New Window clicked (Cmd+Shift+N)")
+                createWindow()
+              },
+            },
+            { type: "separator" },
+            {
+              label: "Close Window",
+              accelerator: "CmdOrCtrl+W",
+              click: () => {
+                const win = getWindow()
+                if (win) {
+                  win.close()
+                }
+              },
+            },
           ],
         },
         {
@@ -706,6 +762,20 @@ if (gotTheLock) {
         },
       ]
       Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+    }
+
+    // macOS: Set dock menu (right-click on dock icon)
+    if (process.platform === "darwin") {
+      const dockMenu = Menu.buildFromTemplate([
+        {
+          label: "New Window",
+          click: () => {
+            console.log("[Dock] New Window clicked")
+            createWindow()
+          },
+        },
+      ])
+      app.dock.setMenu(dockMenu)
     }
 
     // Set update state and rebuild menu
@@ -786,9 +856,9 @@ if (gotTheLock) {
 
     // Initialize auto-updater (production only)
     if (app.isPackaged) {
-      await initAutoUpdater(getWindow)
+      await initAutoUpdater(getAllWindows)
       // Setup update check on window focus (instead of periodic interval)
-      setupFocusUpdateCheck(getWindow)
+      setupFocusUpdateCheck(getAllWindows)
       // Check for updates 5 seconds after startup (force to bypass interval check)
       setTimeout(() => {
         checkForUpdates(true)

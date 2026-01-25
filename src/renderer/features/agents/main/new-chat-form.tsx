@@ -620,17 +620,20 @@ export function NewChatForm({
     prevSelectedDraftIdRef.current = selectedDraftId
 
     if (!selectedDraftId) {
-      // No draft selected - clear editor if we had a draft before (user clicked "New Workspace")
-      currentDraftIdRef.current = null
-      lastSavedTextRef.current = ""
-      if (hadDraftBefore && editorRef.current) {
-        editorRef.current.clear()
-        setHasContent(false)
-      }
+      // No draft selected - only clear if we had a draft before (user clicked "New Workspace")
+      // Don't clear if user is currently typing (currentDraftIdRef has a value)
+      if (hadDraftBefore) {
+        currentDraftIdRef.current = null
+        lastSavedTextRef.current = ""
+        if (editorRef.current) {
+          editorRef.current.clear()
+          setHasContent(false)
+        }
 
-      // Fetch remote branches in background when starting new workspace
-      if (hadDraftBefore && validatedProject?.path) {
-        handleRefreshBranches()
+        // Fetch remote branches in background when starting new workspace
+        if (validatedProject?.path) {
+          handleRefreshBranches()
+        }
       }
       return
     }
@@ -1103,14 +1106,35 @@ export function NewChatForm({
 
   const MAX_FILE_SIZE_FOR_CONTENT = 100 * 1024 // 100KB - files larger than this only get path mention
 
+  // Image extensions that should be handled as attachments (base64)
+  const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"])
+
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault()
       setIsDragOver(false)
       const droppedFiles = Array.from(e.dataTransfer.files)
 
-      // Process files - for text files, read content and add as pasted text
+      // Separate images from other files
+      const imageFiles: File[] = []
+      const otherFiles: File[] = []
+
       for (const file of droppedFiles) {
+        const ext = file.name.includes(".") ? "." + file.name.split(".").pop()?.toLowerCase() : ""
+        if (IMAGE_EXTENSIONS.has(ext)) {
+          imageFiles.push(file)
+        } else {
+          otherFiles.push(file)
+        }
+      }
+
+      // Handle images via existing attachment system (base64)
+      if (imageFiles.length > 0) {
+        handleAddAttachments(imageFiles)
+      }
+
+      // Process other files - for text files, read content and add as file mention
+      for (const file of otherFiles) {
         // Get file path using Electron's webUtils API (more reliable than file.path)
         const filePath: string | undefined = window.webUtils?.getPathForFile?.(file) || (file as File & { path?: string }).path
 
@@ -1186,7 +1210,7 @@ export function NewChatForm({
         })
       })
     },
-    [validatedProject?.path, addPastedText, trpcUtils],
+    [validatedProject?.path, handleAddAttachments, trpcUtils],
   )
 
   // Context items for images and pasted text files

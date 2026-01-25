@@ -1,5 +1,6 @@
 import { atom } from "jotai"
 import { atomFamily, atomWithStorage } from "jotai/utils"
+import { atomWithWindowStorage } from "../../../lib/window-storage"
 import type { LucideIcon } from "lucide-react"
 import { Box, FileText, Terminal, FileDiff, ListTodo } from "lucide-react"
 
@@ -124,11 +125,10 @@ export const unifiedSidebarEnabledAtom = atomWithStorage<boolean>(
   { getOnInit: true },
 )
 
-// Global details sidebar open state (persisted)
-export const detailsSidebarOpenAtom = atomWithStorage<boolean>(
-  "overview:sidebarOpen:global",
+// Details sidebar open state (per-window, persisted)
+export const detailsSidebarOpenAtom = atomWithWindowStorage<boolean>(
+  "overview:sidebarOpen",
   false,
-  undefined,
   { getOnInit: true },
 )
 

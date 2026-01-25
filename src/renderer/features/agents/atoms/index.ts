@@ -1,11 +1,12 @@
 import { atom } from "jotai"
 import { atomFamily, atomWithStorage } from "jotai/utils"
+import { atomWithWindowStorage } from "../../../lib/window-storage"
 
 // Selected agent chat ID - null means "new chat" view (persisted to restore on reload)
-export const selectedAgentChatIdAtom = atomWithStorage<string | null>(
+// Uses window-scoped storage so each Electron window can have its own selected chat
+export const selectedAgentChatIdAtom = atomWithWindowStorage<string | null>(
   "agents:selectedChatId",
   null,
-  undefined,
   { getOnInit: true },
 )
 
@@ -163,10 +164,10 @@ export type SelectedProject = {
   gitRepo?: string | null
 } | null
 
-export const selectedProjectAtom = atomWithStorage<SelectedProject>(
+// Selected local project - uses window-scoped storage so each window can work with different projects
+export const selectedProjectAtom = atomWithWindowStorage<SelectedProject>(
   "agents:selectedProject",
   null,
-  undefined,
   { getOnInit: true },
 )
 
@@ -198,11 +199,10 @@ export const MODEL_ID_MAP: Record<string, string> = {
   haiku: "haiku",
 }
 
-// Sidebar state
-export const agentsSidebarOpenAtom = atomWithStorage<boolean>(
+// Sidebar state - window-scoped so each window has independent sidebar visibility
+export const agentsSidebarOpenAtom = atomWithWindowStorage<boolean>(
   "agents-sidebar-open",
   true,
-  undefined,
   { getOnInit: true },
 )
 
@@ -222,10 +222,10 @@ export const agentsPreviewSidebarWidthAtom = atomWithStorage<number>(
   { getOnInit: true },
 )
 
-export const agentsPreviewSidebarOpenAtom = atomWithStorage<boolean>(
+// Preview sidebar open state - window-scoped
+export const agentsPreviewSidebarOpenAtom = atomWithWindowStorage<boolean>(
   "agents-preview-sidebar-open",
   true,
-  undefined,
   { getOnInit: true },
 )
 
@@ -264,11 +264,10 @@ export const diffViewDisplayModeAtom = atomWithStorage<DiffViewDisplayMode>(
   { getOnInit: true },
 )
 
-// Diff sidebar open state storage - stores per chatId (persisted)
-const diffSidebarOpenStorageAtom = atomWithStorage<Record<string, boolean>>(
+// Diff sidebar open state storage - window-scoped, stores per chatId
+const diffSidebarOpenStorageAtom = atomWithWindowStorage<Record<string, boolean>>(
   "agents:diffSidebarOpen",
   {},
-  undefined,
   { getOnInit: true },
 )
 
@@ -310,10 +309,9 @@ export const diffSidebarOpenAtomFamily = atomFamily((chatId: string) =>
 
 // Legacy global atom - kept for backwards compatibility, maps to empty string key
 // TODO: Remove after migration
-export const agentsDiffSidebarOpenAtom = atomWithStorage<boolean>(
+export const agentsDiffSidebarOpenAtom = atomWithWindowStorage<boolean>(
   "agents-diff-sidebar-open",
   false,
-  undefined,
   { getOnInit: true },
 )
 
@@ -336,9 +334,10 @@ export const diffFilesCollapsedAtomFamily = atomFamily((chatId: string) =>
 )
 
 // Sub-chats display mode - tabs (horizontal) or sidebar (vertical list)
-export const agentsSubChatsSidebarModeAtom = atomWithStorage<
+// Window-scoped so each window can have its own layout preference
+export const agentsSubChatsSidebarModeAtom = atomWithWindowStorage<
   "tabs" | "sidebar"
->("agents-subchats-mode", "tabs", undefined, { getOnInit: true })
+>("agents-subchats-mode", "tabs", { getOnInit: true })
 
 // Sub-chats sidebar width (left side of chat area)
 export const agentsSubChatsSidebarWidthAtom = atomWithStorage<number>(
@@ -659,10 +658,10 @@ export const agentsPlanSidebarWidthAtom = atomWithStorage<number>(
 )
 
 // Plan sidebar open state storage - stores per chatId (persisted)
-const planSidebarOpenStorageAtom = atomWithStorage<Record<string, boolean>>(
+// Uses window-scoped storage so each window can have independent plan sidebar states
+const planSidebarOpenStorageAtom = atomWithWindowStorage<Record<string, boolean>>(
   "agents:planSidebarOpen",
   {},
-  undefined,
   { getOnInit: true },
 )
 
